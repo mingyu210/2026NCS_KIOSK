@@ -1,8 +1,13 @@
 import pandas as pd
-import seaborn as sns
 
-mpg = sns.load_dataset("mpg")
-group_mpg = pd.DataFrame(mpg.groupby(by = 'origin'))
-print(group_mpg)
-print(mpg['origin'].nunique())
-print(mpg.describe())
+def squares(n):
+    return n * n
+
+items = {
+    'a': [100, 80, 90],
+    'b': [95, 75, 85],
+    'c': [70, 100, 99]
+}
+df_items = pd.DataFrame(items, index=[1, 2, 3])
+print(df_items)
+print(df_items.apply(squares)) # Apply function to each object.
