@@ -1,13 +1,9 @@
 import pandas as pd
+import seaborn as sns
 
-def squares(n):
-    return n * n
-
-items = {
-    'a': [100, 80, 90],
-    'b': [95, 75, 85],
-    'c': [70, 100, 99]
-}
-df_items = pd.DataFrame(items, index=[1, 2, 3])
-print(df_items)
-print(df_items.apply(lambda n : n*n)) # Apply function to each object.
+mpg = sns.load_dataset("mpg")
+print(mpg.info())
+# inplace= True  -> 원본을 바꿔라
+# mpg.dropna(subset=['horsepower'], inplace=True) 원본 업데이트
+mpg_lcean = mpg.dropna(subset=['horsepower']) # 사본 생성
+print(mpg_lcean.info())
