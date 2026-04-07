@@ -1,3 +1,4 @@
+```mermaid
 classDiagram
     class Menu {
         +List~str~ drinks
@@ -22,5 +23,6 @@ classDiagram
         +run() None
     }
 
-    %% Aggregation (Has-a) 관계: OrderProcessor가 Menu를 소유함
+    %% Aggregation (Has-a) 관계
     OrderProcessor "1" o-- "1" Menu : aggregation
+```
