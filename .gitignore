@@ -6,6 +6,8 @@ __pycache__/
 
 .idea
 *.txt
+*.db
+*.exe
 
 # C extensions
 *.so
