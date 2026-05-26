@@ -8,6 +8,7 @@ __pycache__/
 *.txt
 *.db
 *.exe
+*.csv
 
 # C extensions
 *.so
