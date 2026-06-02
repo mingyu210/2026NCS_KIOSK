@@ -1,3 +1,5 @@
+import threading
+import time
 import tkinter as tk
 from tkinter import messagebox
 import sqlite3
@@ -169,6 +171,56 @@ class OrderProcessor:
         self.conn.close()  # db connection close ....
 
 
+class WeatherManager:
+    def __init__(self):
+        self.current_weather = "Loading weather information..."
+        self.last_update_time = 0
+        self.update_interval = 30  # 30초 마다 업데이트
+        self.is_updating = False
+
+
+    def should_update(self) -> bool:
+        """Check weather information"""
+        current_time = time.time()
+        return (current_time - self.last_update_time) > self.update_interval
+
+
+    def update_weather_async(self, callback_func) -> None:
+        """Update weather information asynchronously"""
+        if self.is_updating:
+            return  # 이미 업데이트 중이면 중복 요청 방지
+
+        def fetch_weather():
+            self.is_updating = True
+            try:
+                url = "https://wttr.in/incheon?format=4"
+                response = requests.get(url, timeout=5)  # 타임아웃 설정
+
+                if response.status_code == 200:
+                    weather_text = response.text.strip()
+                    self.current_weather = f"Current weather ({weather_text})"
+                else:
+                    self.current_weather = f"Weather information cannot be loaded. (Status code : {response.status_code})"
+
+                self.last_update_time = time.time()
+
+            except requests.exceptions.Timeout:
+                self.current_weather = "Weather information timeout"
+            except requests.exceptions.RequestException as err:
+                self.current_weather = f"Weather information error: Connection failed"
+            except Exception as err:
+                self.current_weather = f"Weather information error: {str(err)}"
+            finally:
+                self.is_updating = False
+                # UI 업데이트를 위한 콜백 호출
+                if callback_func:
+                    callback_func(self.current_weather)
+
+        # 백그라운드 스레드에서 실행
+        thread = threading.Thread(target=fetch_weather, daemon=True)
+        thread.start()
+
+
 class KioskGUI:
     def __init__(self, root: tk.Tk, menu_drinks: List[str], menu_prices: List[int]) -> None:
         self.root = root
@@ -179,9 +231,20 @@ class KioskGUI:
         # Initialize menu and order processor
         self.menu = Menu(menu_drinks, menu_prices)
         self.order_processor = OrderProcessor(self.menu)
+        # Initialize weather manager
+        self.weather_manager = WeatherManager()
 
         # Create UI components
         self.create_widgets()
+
+        # Async update
+        self.weather_manager.update_weather_async(self.update_weather_display)
+
+
+    def update_weather_display(self, weather_text: str) -> None:
+        """UI의 날씨 정보를 업데이트 (메인 스레드에서 실행)"""
+        self.root.after(0, lambda: self.weather_label.config(text=weather_text))
+
 
     def create_widgets(self) -> None:
         """Create and initialize all GUI widgets"""
@@ -287,24 +350,24 @@ class KioskGUI:
         self.root.grid_columnconfigure(1, weight=1)
 
 
-    def update_weather_info(self) -> None:
-        """ Load weather data from 'wttr.in'"""
-        # url = "https://wttr.in/incheon?&0&Q"
-        url = "https://wttr.in/incheon?format=4"  # ok
-        # url = "https://naver.com/kim"  # 404
-        # url = "https://wttr123.in/incheon?format=4"  # exception occur
-        # url = "https://www.nate.com"
-        try:
-            response = requests.get(url)  # exception occur
-            weather_text = response.text.strip()
-            if response.status_code == 200:
-                self.weather_label.config(text=f"Current weather ({weather_text})")
-            else:
-                self.weather_label.config(text=f"Weather information cannot be loaded. (Status code : {response.status_code})")
-        except Exception as err:
-            self.weather_label.config(text=f"Weather information error\n{err}")
-            messagebox.showinfo("날씨 정보", f"Weather information error\n{err}")
-            # print(err)
+    # def update_weather_info(self) -> None:
+    #     """ Load weather data from 'wttr.in'"""
+    #     # url = "https://wttr.in/incheon?&0&Q"
+    #     url = "https://wttr.in/incheon?format=2"  # ok
+    #     # url = "https://naver.com/kim"  # 404
+    #     # url = "https://wttr123.in/incheon?format=4"  # exception occur
+    #     # url = "https://www.nate.com"
+    #     try:
+    #         response = requests.get(url)
+    #         weather_text = response.text.strip()
+    #         if response.status_code == 200:
+    #             self.weather_label.config(text=f"Current weather ({weather_text})")
+    #         else:
+    #             self.weather_label.config(text=f"Weather information cannot be loaded. (Status code : {response.status_code})")
+    #     except Exception as err:
+    #         self.weather_label.config(text=f"Weather information error\n{err}")
+    #         # messagebox.showerror("Error", f"Weather information error\n{err}")
+    #         # print(err)
 
 
     def add_to_order(self, idx: int) -> None:
@@ -314,7 +377,10 @@ class KioskGUI:
         """
         self.order_processor.process_order(idx)
         self.update_order_display()
-        self.update_weather_info()  # 추가 주문 시 날씨 정보 로딩
+        # self.update_weather_info()  # Load weather data
+        if self.weather_manager.should_update():
+            self.weather_manager.update_weather_async(self.update_weather_display)
+
 
     def update_order_display(self) -> None:
         """Update the order summary in the text widget"""
@@ -354,6 +420,7 @@ class KioskGUI:
         # Disable editing
         self.order_text.config(state=tk.DISABLED)
 
+
     def complete_order(self) -> None:
         """Complete the current order and show receipt"""
         if self.order_processor.total_price <= 0:
@@ -390,12 +457,14 @@ class KioskGUI:
             command=lambda: [receipt_window.destroy(), self.reset_order()]
         ).pack(pady=10)
 
+
     def reset_order(self) -> None:
         """Reset the current order"""
         # Create a new OrderProcessor with the same menu
         self.order_processor = OrderProcessor(self.menu)
         # Update display
         self.update_order_display()
+
 
     def exit_program(self) -> None:
         """Exit the program"""
