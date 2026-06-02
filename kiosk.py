@@ -303,6 +303,7 @@ class KioskGUI:
                 self.weather_label.config(text=f"Weather information cannot be loaded. (Status code : {response.status_code})")
         except Exception as err:
             self.weather_label.config(text=f"Weather information error\n{err}")
+            messagebox.showinfo("날씨 정보", f"Weather information error\n{err}")
             # print(err)
 
 
